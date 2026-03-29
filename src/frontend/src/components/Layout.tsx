@@ -12,13 +12,16 @@ import {
   CalendarCheck,
   ChevronRight,
   ClipboardList,
+  CreditCard,
   DollarSign,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
+  Monitor,
   Search,
   Settings,
+  Shield,
   UserCog,
   Users,
   X,
@@ -26,6 +29,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useSchoolProfile } from "../contexts/SchoolProfileContext";
 import { RATE_LIMIT_EVENT } from "../lib/api";
 
 type NavItem = {
@@ -34,18 +38,47 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-  { label: "Students", path: "/students", icon: Users },
-  { label: "Teachers", path: "/teachers", icon: GraduationCap },
-  { label: "Admissions", path: "/admissions", icon: ClipboardList },
-  { label: "Attendance", path: "/attendance", icon: CalendarCheck },
-  { label: "Fees", path: "/fees", icon: DollarSign },
-  { label: "Exams", path: "/exams", icon: BookOpen },
-  { label: "Schedule", path: "/schedule", icon: Calendar },
-  { label: "Staff", path: "/staff", icon: UserCog },
-  { label: "Reports", path: "/reports", icon: BarChart3 },
-  { label: "Settings", path: "/settings", icon: Settings },
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    label: "Core",
+    items: [
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Students", path: "/students", icon: Users },
+      { label: "Teachers", path: "/teachers", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Academic",
+    items: [
+      { label: "Admissions", path: "/admissions", icon: ClipboardList },
+      { label: "Attendance", path: "/attendance", icon: CalendarCheck },
+      { label: "Online Classes", path: "/online-classes", icon: Monitor },
+      { label: "Timetable", path: "/schedule", icon: Calendar },
+      { label: "Report Cards", path: "/report-cards", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Fees", path: "/fees", icon: DollarSign },
+      { label: "HR & Payroll", path: "/hr-payroll", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      { label: "ID Cards", path: "/id-cards", icon: CreditCard },
+      { label: "Notifications", path: "/notifications", icon: Bell },
+      { label: "Teacher Portal", path: "/teacher", icon: UserCog },
+      { label: "Admin", path: "/admin", icon: Shield },
+      { label: "Settings", path: "/settings", icon: Settings },
+    ],
+  },
 ];
 
 type RateLimitInfo = {
@@ -57,6 +90,7 @@ type RateLimitInfo = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const { profile } = useSchoolProfile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
   const [rateLimitDismissed, setRateLimitDismissed] = useState(false);
@@ -95,55 +129,75 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         style={{ borderColor: "oklch(0.3 0.04 240)" }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <GraduationCap className="w-5 h-5 text-primary-foreground" />
-          </div>
+          {profile.logo ? (
+            <img
+              src={profile.logo}
+              alt="logo"
+              className="w-8 h-8 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <GraduationCap className="w-5 h-5 text-primary-foreground" />
+            </div>
+          )}
           <span className="text-lg font-bold text-sidebar-foreground tracking-tight">
-            EscolaUI
+            {profile.schoolName}
           </span>
         </div>
         <p className="text-xs mt-1" style={{ color: "oklch(0.65 0.03 240)" }}>
-          Central High School
+          {profile.tagline}
         </p>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
-          const active =
-            location.pathname === item.path ||
-            (item.path !== "/dashboard" &&
-              location.pathname.startsWith(item.path));
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={() => setSidebarOpen(false)}
-              data-ocid={`nav.${item.label.toLowerCase()}.link`}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
-                active
-                  ? "text-white"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-white/5"
-              }`}
-              style={
-                active
-                  ? {
-                      background: "oklch(0.42 0.14 255 / 0.25)",
-                      color: "white",
-                    }
-                  : {}
-              }
+      {/* Nav Groups */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        {navGroups.map((group) => (
+          <div key={group.label} className="mb-4">
+            <p
+              className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: "oklch(0.5 0.03 240)" }}
             >
-              <item.icon
-                className={`w-4 h-4 flex-shrink-0 ${active ? "text-primary" : ""}`}
-              />
-              <span>{item.label}</span>
-              {active && (
-                <ChevronRight className="w-3 h-3 ml-auto text-primary" />
-              )}
-            </Link>
-          );
-        })}
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active =
+                  location.pathname === item.path ||
+                  (item.path !== "/dashboard" &&
+                    location.pathname.startsWith(item.path));
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    data-ocid={`nav.${item.label.toLowerCase().replace(/[^a-z0-9]/g, "_")}.link`}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
+                      active
+                        ? "text-white"
+                        : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-white/5"
+                    }`}
+                    style={
+                      active
+                        ? {
+                            background: "oklch(0.42 0.14 255 / 0.25)",
+                            color: "white",
+                          }
+                        : {}
+                    }
+                  >
+                    <item.icon
+                      className={`w-4 h-4 flex-shrink-0 ${active ? "text-primary" : ""}`}
+                    />
+                    <span>{item.label}</span>
+                    {active && (
+                      <ChevronRight className="w-3 h-3 ml-auto text-primary" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* User quick info at bottom */}

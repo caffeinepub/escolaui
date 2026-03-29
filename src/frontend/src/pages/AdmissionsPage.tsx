@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
@@ -34,6 +35,12 @@ const statusConfig: Record<
 };
 
 const PAGE_SIZE = 7;
+
+function generateEnrollmentId(_name: string, idx: number) {
+  const year = new Date().getFullYear();
+  const num = String(1000 + idx).padStart(4, "0");
+  return `ENR-${year}-${num}`;
+}
 
 export default function AdmissionsPage() {
   const [filter, setFilter] = useState<FilterStatus>("all");
@@ -196,7 +203,7 @@ export default function AdmissionsPage() {
                     Status
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground hidden sm:table-cell">
-                    Docs
+                    Enrollment ID
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">
                     Actions
@@ -234,9 +241,19 @@ export default function AdmissionsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className="text-xs text-muted-foreground">
-                        {app.documents} files
-                      </span>
+                      {app.status === "approved" ||
+                      app.status === "enrolled" ? (
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-mono bg-primary/5 text-primary border-primary/30"
+                        >
+                          {generateEnrollmentId(app.applicantName, i + 1)}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">
+                          –
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
@@ -288,11 +305,10 @@ export default function AdmissionsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-border flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              Showing {(page - 1) * PAGE_SIZE + 1}–
+              Showing {(page - 1) * PAGE_SIZE + 1}\u2013
               {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
             </p>
             <div className="flex gap-1">

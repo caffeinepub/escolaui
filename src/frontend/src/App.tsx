@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import {
+  Outlet,
   RouterProvider,
   createRootRoute,
   createRoute,
@@ -9,21 +10,31 @@ import {
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SchoolProfileProvider } from "./contexts/SchoolProfileContext";
+import AdminPage from "./pages/AdminPage";
 import AdmissionsPage from "./pages/AdmissionsPage";
 import AttendancePage from "./pages/AttendancePage";
 import DashboardPage from "./pages/DashboardPage";
 import FeesPage from "./pages/FeesPage";
+import HRPayrollPage from "./pages/HRPayrollPage";
+import IDCardPage from "./pages/IDCardPage";
 import LoginPage from "./pages/LoginPage";
 import NewApplicationPage from "./pages/NewApplicationPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import OnlineClassesPage from "./pages/OnlineClassesPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
+import ReportCardPage from "./pages/ReportCardPage";
 import SchedulePage from "./pages/SchedulePage";
+import TeacherPage from "./pages/TeacherPage";
 
 const rootRoute = createRootRoute({
   component: () => (
-    <AuthProvider>
-      <RouterProvider router={router} />
-      <Toaster richColors position="top-right" />
-    </AuthProvider>
+    <SchoolProfileProvider>
+      <AuthProvider>
+        <Outlet />
+        <Toaster richColors position="top-right" />
+      </AuthProvider>
+    </SchoolProfileProvider>
   ),
 });
 
@@ -40,7 +51,6 @@ const loginRoute = createRoute({
   path: "/login",
   component: LoginPage,
 });
-
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -58,7 +68,6 @@ const dashboardRoute = createRoute({
     </Protected>
   ),
 });
-
 const admissionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admissions",
@@ -68,7 +77,6 @@ const admissionsRoute = createRoute({
     </Protected>
   ),
 });
-
 const newApplicationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admissions/new",
@@ -78,7 +86,6 @@ const newApplicationRoute = createRoute({
     </Protected>
   ),
 });
-
 const studentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/students",
@@ -91,7 +98,6 @@ const studentsRoute = createRoute({
     </Protected>
   ),
 });
-
 const teachersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/teachers",
@@ -104,7 +110,6 @@ const teachersRoute = createRoute({
     </Protected>
   ),
 });
-
 const attendanceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/attendance",
@@ -114,7 +119,6 @@ const attendanceRoute = createRoute({
     </Protected>
   ),
 });
-
 const feesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/fees",
@@ -124,20 +128,6 @@ const feesRoute = createRoute({
     </Protected>
   ),
 });
-
-const examsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/exams",
-  component: () => (
-    <Protected>
-      <PlaceholderPage
-        title="Exams"
-        description="Schedule exams, enter grades, and generate report cards."
-      />
-    </Protected>
-  ),
-});
-
 const scheduleRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/schedule",
@@ -147,20 +137,98 @@ const scheduleRoute = createRoute({
     </Protected>
   ),
 });
+const onlineClassesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/online-classes",
+  component: () => (
+    <Protected>
+      <OnlineClassesPage />
+    </Protected>
+  ),
+});
+const idCardsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/id-cards",
+  component: () => (
+    <Protected>
+      <IDCardPage />
+    </Protected>
+  ),
+});
+const reportCardsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/report-cards",
+  component: () => (
+    <Protected>
+      <ReportCardPage />
+    </Protected>
+  ),
+});
+const notificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/notifications",
+  component: () => (
+    <Protected>
+      <NotificationsPage />
+    </Protected>
+  ),
+});
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: () => (
+    <Protected>
+      <AdminPage />
+    </Protected>
+  ),
+});
+const teacherRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/teacher",
+  component: () => (
+    <Protected>
+      <TeacherPage />
+    </Protected>
+  ),
+});
+const hrPayrollRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/hr-payroll",
+  component: () => (
+    <Protected>
+      <HRPayrollPage />
+    </Protected>
+  ),
+});
 
+// Kept for old paths
+const examsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/exams",
+  component: () => (
+    <Protected>
+      <ReportCardPage />
+    </Protected>
+  ),
+});
 const staffRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/staff",
   component: () => (
     <Protected>
-      <PlaceholderPage
-        title="Staff & HR"
-        description="Manage staff records, payroll, and human resources."
-      />
+      <HRPayrollPage />
     </Protected>
   ),
 });
-
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: () => (
+    <Protected>
+      <AdminPage />
+    </Protected>
+  ),
+});
 const reportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reports",
@@ -169,19 +237,6 @@ const reportsRoute = createRoute({
       <PlaceholderPage
         title="Reports & Analytics"
         description="Generate comprehensive reports and view school analytics."
-      />
-    </Protected>
-  ),
-});
-
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings",
-  component: () => (
-    <Protected>
-      <PlaceholderPage
-        title="Settings"
-        description="Configure system preferences, user roles, and integrations."
       />
     </Protected>
   ),
@@ -197,11 +252,18 @@ const routeTree = rootRoute.addChildren([
   teachersRoute,
   attendanceRoute,
   feesRoute,
-  examsRoute,
   scheduleRoute,
+  onlineClassesRoute,
+  idCardsRoute,
+  reportCardsRoute,
+  notificationsRoute,
+  adminRoute,
+  teacherRoute,
+  hrPayrollRoute,
+  examsRoute,
   staffRoute,
-  reportsRoute,
   settingsRoute,
+  reportsRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -213,10 +275,5 @@ declare module "@tanstack/react-router" {
 }
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-      <Toaster richColors position="top-right" />
-    </AuthProvider>
-  );
+  return <RouterProvider router={router} />;
 }

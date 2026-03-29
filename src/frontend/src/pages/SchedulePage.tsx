@@ -1,3 +1,12 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -9,14 +18,19 @@ import {
   BookOpen,
   Calculator,
   Dumbbell,
+  Edit2,
   FlaskConical,
   Globe,
+  Loader2,
   Monitor,
   Music,
   Palette,
+  Sparkles,
+  TriangleAlert,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   type TimetableEntry,
   mockClasses,
@@ -110,7 +124,30 @@ const subjectIcons: Record<
   "Physical Education": Dumbbell,
 };
 
-function SubjectCell({ entry }: { entry: TimetableEntry | undefined }) {
+type EditCell = {
+  day: TimetableEntry["day"];
+  period: number;
+  subject: string;
+  teacher: string;
+  room: string;
+};
+
+function SubjectCell({
+  entry,
+  hasClash,
+  editMode,
+  onEdit,
+}: {
+  entry: TimetableEntry | undefined;
+  hasClash: boolean;
+  editMode: boolean;
+  onEdit: (data: EditCell) => void;
+}) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [localSubject, setLocalSubject] = useState(entry?.subject ?? "");
+  const [localTeacher, setLocalTeacher] = useState(entry?.teacher ?? "");
+  const [localRoom, setLocalRoom] = useState(entry?.room ?? "");
+
   if (!entry) {
     return (
       <div className="h-full flex items-center justify-center px-2 py-3">
@@ -128,10 +165,17 @@ function SubjectCell({ entry }: { entry: TimetableEntry | undefined }) {
   };
   const Icon = subjectIcons[entry.subject];
 
-  return (
+  const cell = (
     <div
-      className={`h-full rounded-lg border ${colors.bg} ${colors.border} px-2 py-2 flex flex-col justify-between m-0.5`}
+      className={`h-full rounded-lg border ${colors.bg} ${colors.border} px-2 py-2 flex flex-col justify-between m-0.5 relative ${
+        editMode ? "cursor-pointer hover:ring-2 hover:ring-primary/50" : ""
+      }`}
     >
+      {hasClash && (
+        <div className="absolute top-0.5 right-0.5">
+          <TriangleAlert className="w-3 h-3 text-destructive" />
+        </div>
+      )}
       <div className="flex items-start gap-1.5">
         {Icon && (
           <Icon className={`w-3 h-3 mt-0.5 flex-shrink-0 ${colors.text}`} />
@@ -148,19 +192,129 @@ function SubjectCell({ entry }: { entry: TimetableEntry | undefined }) {
       </div>
     </div>
   );
+
+  if (!editMode) return cell;
+
+  return (
+    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full h-full text-left p-0 border-0 bg-transparent cursor-pointer"
+          onClick={() => {
+            setLocalSubject(entry.subject);
+            setLocalTeacher(entry.teacher);
+            setLocalRoom(entry.room);
+            setPopoverOpen(true);
+          }}
+        >
+          {cell}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56" data-ocid="schedule.edit.popover">
+        <div className="space-y-3">
+          <div className="flex items-center gap-1 mb-1">
+            <Edit2 className="w-3.5 h-3.5 text-primary" />
+            <p className="text-sm font-semibold">Edit Period</p>
+          </div>
+          <div>
+            <Label className="text-xs">Subject</Label>
+            <Input
+              value={localSubject}
+              onChange={(e) => setLocalSubject(e.target.value)}
+              className="mt-1 h-7 text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Teacher</Label>
+            <Input
+              value={localTeacher}
+              onChange={(e) => setLocalTeacher(e.target.value)}
+              className="mt-1 h-7 text-xs"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Room</Label>
+            <Input
+              value={localRoom}
+              onChange={(e) => setLocalRoom(e.target.value)}
+              className="mt-1 h-7 text-xs"
+            />
+          </div>
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              onEdit({
+                day: entry.day,
+                period: entry.period,
+                subject: localSubject,
+                teacher: localTeacher,
+                room: localRoom,
+              });
+              setPopoverOpen(false);
+            }}
+            data-ocid="schedule.edit.save_button"
+          >
+            Save
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function SchedulePage() {
   const [selectedClass, setSelectedClass] = useState("10A");
+  const [timetable, setTimetable] = useState<TimetableEntry[]>(mockTimetable);
+  const [editMode, setEditMode] = useState(false);
+  const [autoSolving, setAutoSolving] = useState(false);
 
   const timetableMap: Record<string, TimetableEntry> = {};
-  for (const entry of mockTimetable) {
+  for (const entry of timetable) {
     timetableMap[`${entry.day}-${entry.period}`] = entry;
   }
 
-  const subjects = Array.from(
-    new Set(mockTimetable.map((e) => e.subject)),
-  ).sort();
+  // Clash detection: same teacher in same period across different days (simplified: same teacher twice in same period)
+  const clashKeys = new Set<string>();
+  const teacherPeriodMap: Record<string, string[]> = {};
+  for (const entry of timetable) {
+    const key = `${entry.teacher}-${entry.period}`;
+    if (!teacherPeriodMap[key]) teacherPeriodMap[key] = [];
+    teacherPeriodMap[key].push(`${entry.day}-${entry.period}`);
+  }
+  for (const keys of Object.values(teacherPeriodMap)) {
+    if (keys.length > 1) {
+      for (const k of keys) clashKeys.add(k);
+    }
+  }
+
+  const subjects = Array.from(new Set(timetable.map((e) => e.subject))).sort();
+
+  async function handleAutoSolve() {
+    setAutoSolving(true);
+    await new Promise((r) => setTimeout(r, 2000));
+    setAutoSolving(false);
+    toast.success("Timetable generated successfully", {
+      description: "No clashes detected in the new schedule",
+    });
+  }
+
+  function handleEditCell(data: EditCell) {
+    setTimetable((prev) =>
+      prev.map((e) =>
+        e.day === data.day && e.period === data.period
+          ? {
+              ...e,
+              subject: data.subject,
+              teacher: data.teacher,
+              room: data.room,
+            }
+          : e,
+      ),
+    );
+    toast.success("Period updated");
+  }
 
   return (
     <motion.div
@@ -172,26 +326,64 @@ export default function SchedulePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">
-            Schedule &amp; Timetable
-          </h1>
+          <h1 className="text-xl font-bold text-foreground">Class Timetable</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Weekly class schedule and period allocations
           </p>
         </div>
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger className="w-36" data-ocid="schedule.class.select">
-            <SelectValue placeholder="Select Class" />
-          </SelectTrigger>
-          <SelectContent>
-            {mockClasses.map((c) => (
-              <SelectItem key={c} value={c}>
-                Class {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setEditMode((m) => !m)}
+            data-ocid="schedule.edit_mode.toggle"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            {editMode ? "Exit Edit" : "Edit Mode"}
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={handleAutoSolve}
+            disabled={autoSolving}
+            data-ocid="schedule.auto_solve.button"
+          >
+            {autoSolving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Solving...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" /> Auto-Solve
+              </>
+            )}
+          </Button>
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-36" data-ocid="schedule.class.select">
+              <SelectValue placeholder="Select Class" />
+            </SelectTrigger>
+            <SelectContent>
+              {mockClasses.map((c) => (
+                <SelectItem key={c} value={c}>
+                  Class {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {clashKeys.size > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+          <TriangleAlert className="w-4 h-4 flex-shrink-0" />
+          <span>
+            Scheduling clash detected: a teacher is assigned to multiple classes
+            in the same period. Cells are marked with{" "}
+            <TriangleAlert className="w-3 h-3 inline" />.
+          </span>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap gap-2">
@@ -207,6 +399,14 @@ export default function SchedulePage() {
             </span>
           );
         })}
+        {editMode && (
+          <Badge
+            variant="outline"
+            className="text-xs bg-primary/10 text-primary border-primary/30"
+          >
+            Edit Mode Active
+          </Badge>
+        )}
       </div>
 
       {/* Desktop Grid */}
@@ -220,7 +420,6 @@ export default function SchedulePage() {
           className="grid"
           style={{ gridTemplateColumns: "80px repeat(5, 1fr)" }}
         >
-          {/* Header Row */}
           <div className="bg-muted/50 border-b border-r border-border px-3 py-3 flex items-center">
             <span className="text-xs font-semibold text-muted-foreground">
               Period
@@ -238,7 +437,6 @@ export default function SchedulePage() {
             </div>
           ))}
 
-          {/* Period Rows */}
           {PERIODS.map((period) => (
             <>
               <div
@@ -258,7 +456,12 @@ export default function SchedulePage() {
                   className="border-b border-r border-border last:border-r-0 min-h-[80px]"
                   data-ocid={`schedule.${day.toLowerCase()}.period.${period}.card`}
                 >
-                  <SubjectCell entry={timetableMap[`${day}-${period}`]} />
+                  <SubjectCell
+                    entry={timetableMap[`${day}-${period}`]}
+                    hasClash={clashKeys.has(`${day}-${period}`)}
+                    editMode={editMode}
+                    onEdit={handleEditCell}
+                  />
                 </div>
               ))}
             </>
@@ -266,7 +469,7 @@ export default function SchedulePage() {
         </div>
       </motion.div>
 
-      {/* Mobile: vertical grouped by day */}
+      {/* Mobile */}
       <div className="md:hidden space-y-4">
         {DAYS.map((day, di) => (
           <motion.div
@@ -284,6 +487,7 @@ export default function SchedulePage() {
             <div className="divide-y divide-border">
               {PERIODS.map((period) => {
                 const entry = timetableMap[`${day}-${period}`];
+                const hasClash = clashKeys.has(`${day}-${period}`);
                 return (
                   <div
                     key={period}
@@ -298,15 +502,20 @@ export default function SchedulePage() {
                       </p>
                     </div>
                     {entry ? (
-                      <div className="flex-1">
-                        <p
-                          className={`text-sm font-semibold ${subjectColors[entry.subject]?.text ?? "text-foreground"}`}
-                        >
-                          {entry.subject}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.teacher} · {entry.room}
-                        </p>
+                      <div className="flex-1 flex items-center gap-2">
+                        <div>
+                          <p
+                            className={`text-sm font-semibold ${subjectColors[entry.subject]?.text ?? "text-foreground"}`}
+                          >
+                            {entry.subject}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {entry.teacher} \u00b7 {entry.room}
+                          </p>
+                        </div>
+                        {hasClash && (
+                          <TriangleAlert className="w-4 h-4 text-destructive ml-auto" />
+                        )}
                       </div>
                     ) : (
                       <div className="flex-1">

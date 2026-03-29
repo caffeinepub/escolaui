@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  FileCheck,
   Loader2,
   Upload,
   X,
@@ -42,6 +44,36 @@ type Step3 = {
   parentEmail: string;
   parentPhone: string;
   address: string;
+};
+
+type DocStatus = "pending" | "verified" | "rejected";
+
+const REQUIRED_DOCS: { name: string; description: string }[] = [
+  { name: "Birth Certificate", description: "Original or certified copy" },
+  { name: "Previous School Report", description: "Last two terms' reports" },
+  {
+    name: "Passport Photo",
+    description: "Recent passport-sized photo (jpg/png)",
+  },
+  { name: "Medical Records", description: "Immunization and health records" },
+];
+
+const DOC_STATUS_CONFIG: Record<
+  DocStatus,
+  { label: string; className: string }
+> = {
+  pending: {
+    label: "Pending",
+    className: "bg-warning/10 text-warning border-warning/30",
+  },
+  verified: {
+    label: "Verified",
+    className: "bg-success/10 text-success border-success/30",
+  },
+  rejected: {
+    label: "Rejected",
+    className: "bg-destructive/10 text-destructive border-destructive/30",
+  },
 };
 
 const STEPS = [
@@ -76,7 +108,12 @@ export default function NewApplicationPage() {
     parentPhone: "",
     address: "",
   });
-
+  const [docStatuses, setDocStatuses] = useState<Record<string, DocStatus>>(
+    () => Object.fromEntries(REQUIRED_DOCS.map((d) => [d.name, "pending"])),
+  );
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, File | null>>(
+    Object.fromEntries(REQUIRED_DOCS.map((d) => [d.name, null])),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateStep = () => {
@@ -110,7 +147,6 @@ export default function NewApplicationPage() {
     if (!validateStep()) return;
     setStep((s) => s + 1);
   };
-
   const handleBack = () => {
     setErrors({});
     setStep((s) => s - 1);
@@ -127,17 +163,14 @@ export default function NewApplicationPage() {
     navigate({ to: "/admissions" });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    setStep3((s) => ({ ...s, documents: [...s.documents, ...files] }));
-  };
-
-  const removeFile = (idx: number) => {
-    setStep3((s) => ({
-      ...s,
-      documents: s.documents.filter((_, i) => i !== idx),
-    }));
-  };
+  function handleDocUpload(docName: string, file: File) {
+    setUploadedDocs((prev) => ({ ...prev, [docName]: file }));
+    // Simulate auto-verification for most docs
+    setTimeout(() => {
+      setDocStatuses((prev) => ({ ...prev, [docName]: "verified" }));
+      toast.success(`${docName} verified`);
+    }, 1500);
+  }
 
   const FieldError = ({ name }: { name: string }) =>
     errors[name] ? (
@@ -397,6 +430,64 @@ export default function NewApplicationPage() {
                   />
                 </div>
               </div>
+
+              {/* Document Upload Section */}
+              <div className="mt-6">
+                <h3 className="font-semibold text-foreground text-sm mb-3 flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-primary" /> Required
+                  Documents
+                </h3>
+                <div className="space-y-3">
+                  {REQUIRED_DOCS.map((doc) => {
+                    const status = docStatuses[doc.name];
+                    const uploaded = uploadedDocs[doc.name];
+                    return (
+                      <div
+                        key={doc.name}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-border bg-accent/30"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {doc.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.description}
+                          </p>
+                          {uploaded && (
+                            <p className="text-xs text-primary mt-0.5 truncate">
+                              {uploaded.name}
+                            </p>
+                          )}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] flex-shrink-0 ${DOC_STATUS_CONFIG[status].className}`}
+                        >
+                          {DOC_STATUS_CONFIG[status].label}
+                        </Badge>
+                        <label
+                          className="cursor-pointer flex-shrink-0"
+                          data-ocid="application.doc_upload.upload_button"
+                        >
+                          <div className="flex items-center gap-1 px-2 py-1 rounded border border-border text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+                            <Upload className="w-3 h-3" />
+                            <span>{uploaded ? "Replace" : "Upload"}</span>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleDocUpload(doc.name, file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </motion.div>
           )}
 
@@ -409,19 +500,19 @@ export default function NewApplicationPage() {
               className="space-y-4"
             >
               <h2 className="font-semibold text-foreground">
-                Documents & Contact
+                Documents &amp; Contact
               </h2>
-
-              {/* File Upload */}
               <div>
-                <Label className="text-xs">Upload Documents (PDF / JPG)</Label>
+                <Label className="text-xs">
+                  Additional Documents (PDF / JPG)
+                </Label>
                 <label
                   className="mt-1 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:bg-accent/50 transition-colors"
                   data-ocid="application.dropzone"
                 >
                   <Upload className="w-6 h-6 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    Click to upload files
+                    Click to upload additional files
                   </span>
                   <span className="text-xs text-muted-foreground/60">
                     PDF, JPG up to 10MB each
@@ -431,7 +522,15 @@ export default function NewApplicationPage() {
                     accept=".pdf,.jpg,.jpeg"
                     multiple
                     className="hidden"
-                    onChange={handleFileUpload}
+                    onChange={(e) =>
+                      setStep3((s) => ({
+                        ...s,
+                        documents: [
+                          ...s.documents,
+                          ...Array.from(e.target.files ?? []),
+                        ],
+                      }))
+                    }
                     data-ocid="application.upload_button"
                   />
                 </label>
@@ -450,7 +549,12 @@ export default function NewApplicationPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => removeFile(i)}
+                          onClick={() =>
+                            setStep3((s) => ({
+                              ...s,
+                              documents: s.documents.filter((_, j) => j !== i),
+                            }))
+                          }
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -460,7 +564,6 @@ export default function NewApplicationPage() {
                   </div>
                 )}
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label className="text-xs">Parent / Guardian Name *</Label>
@@ -518,7 +621,6 @@ export default function NewApplicationPage() {
           )}
         </AnimatePresence>
 
-        {/* Navigation */}
         <div className="flex items-center justify-between mt-6 pt-5 border-t border-border">
           <Button
             variant="outline"

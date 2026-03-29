@@ -15,10 +15,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Bell,
   CalendarDays,
   CheckCircle2,
   Clock,
+  QrCode,
   Save,
   Users,
   XCircle,
@@ -60,6 +63,52 @@ const statusConfig: Record<
   },
 };
 
+type AbsenceReport = {
+  studentId: string;
+  name: string;
+  class: string;
+  totalAbsences: number;
+  lastAbsent: string;
+};
+
+const absenceReports: AbsenceReport[] = [
+  {
+    studentId: "s1",
+    name: "Adaeze Okonkwo",
+    class: "10A",
+    totalAbsences: 4,
+    lastAbsent: "2026-03-25",
+  },
+  {
+    studentId: "s3",
+    name: "Fatima Al-Hassan",
+    class: "10A",
+    totalAbsences: 7,
+    lastAbsent: "2026-03-28",
+  },
+  {
+    studentId: "s5",
+    name: "Amara Diallo",
+    class: "10B",
+    totalAbsences: 2,
+    lastAbsent: "2026-03-20",
+  },
+  {
+    studentId: "s7",
+    name: "Yemi Adeyemi",
+    class: "10B",
+    totalAbsences: 5,
+    lastAbsent: "2026-03-27",
+  },
+  {
+    studentId: "s9",
+    name: "Kola Aina",
+    class: "11A",
+    totalAbsences: 3,
+    lastAbsent: "2026-03-22",
+  },
+];
+
 export default function AttendancePage() {
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
@@ -71,6 +120,10 @@ export default function AttendancePage() {
       mockAttendanceRecords.map((r) => [r.studentId, r.status]),
     ),
   );
+  const [qrInput, setQrInput] = useState("");
+  const [scanHistory, setScanHistory] = useState<
+    { id: string; name: string; time: string }[]
+  >([]);
 
   const classStudents = mockStudents.filter((s) => s.class === selectedClass);
   const counts = classStudents.reduce(
@@ -88,8 +141,31 @@ export default function AttendancePage() {
 
   function handleSubmit() {
     toast.success(`Attendance for Class ${selectedClass} saved successfully!`, {
-      description: `${counts.present} present · ${counts.absent} absent · ${counts.late} late`,
+      description: `${counts.present} present \u00b7 ${counts.absent} absent \u00b7 ${counts.late} late`,
     });
+  }
+
+  function handleQrScan() {
+    const trimmed = qrInput.trim();
+    if (!trimmed) return;
+    const student = mockStudents.find(
+      (s) => s.id === trimmed || s.rollNo.toString() === trimmed,
+    );
+    if (!student) {
+      toast.error(`Student ID "${trimmed}" not found`);
+      return;
+    }
+    setAttendance((prev) => ({ ...prev, [student.id]: "present" }));
+    setScanHistory((prev) => [
+      {
+        id: student.id,
+        name: student.name,
+        time: new Date().toLocaleTimeString(),
+      },
+      ...prev,
+    ]);
+    toast.success(`${student.name} marked present via QR`);
+    setQrInput("");
   }
 
   const statCards = [
@@ -190,98 +266,265 @@ export default function AttendancePage() {
         ))}
       </div>
 
-      {/* Table */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="bg-card rounded-xl border border-border shadow-card p-5"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-foreground">
-            Class {selectedClass} —{" "}
-            {new Date(date).toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </h2>
-          <Badge variant="outline" className="text-xs">
-            {classStudents.length} students
-          </Badge>
-        </div>
+      <Tabs defaultValue="daily">
+        <TabsList data-ocid="attendance.tab">
+          <TabsTrigger value="daily">Daily Marking</TabsTrigger>
+          <TabsTrigger value="qr">QR / Biometric Import</TabsTrigger>
+          <TabsTrigger value="reports">Absence Reports</TabsTrigger>
+        </TabsList>
 
-        {classStudents.length === 0 ? (
-          <div
-            className="text-center py-16 text-muted-foreground"
-            data-ocid="attendance.empty_state"
+        {/* Daily Marking */}
+        <TabsContent value="daily" className="mt-5">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="bg-card rounded-xl border border-border shadow-card p-5"
           >
-            <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No students in this class</p>
-          </div>
-        ) : (
-          <Table data-ocid="attendance.table">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Roll No.</TableHead>
-                <TableHead>Student Name</TableHead>
-                <TableHead className="text-right">Attendance</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {classStudents.map((student, i) => {
-                const status = attendance[student.id] ?? "present";
-                return (
-                  <TableRow
-                    key={student.id}
-                    data-ocid={`attendance.item.${i + 1}`}
-                  >
-                    <TableCell className="font-mono text-muted-foreground text-sm">
-                      {student.rollNo.toString().padStart(2, "0")}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {student.name}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {(
-                          ["present", "absent", "late"] as AttendanceStatus[]
-                        ).map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            onClick={() => setStatus(student.id, s)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                              status === s
-                                ? statusConfig[s].className
-                                : "border-border text-muted-foreground hover:bg-accent"
-                            }`}
-                            data-ocid={`attendance.${s}.toggle`}
-                          >
-                            {statusConfig[s].label}
-                          </button>
-                        ))}
-                      </div>
-                    </TableCell>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-foreground">
+                Class {selectedClass} &mdash;{" "}
+                {new Date(date).toLocaleDateString("en-GB", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </h2>
+              <Badge variant="outline" className="text-xs">
+                {classStudents.length} students
+              </Badge>
+            </div>
+
+            {classStudents.length === 0 ? (
+              <div
+                className="text-center py-16 text-muted-foreground"
+                data-ocid="attendance.empty_state"
+              >
+                <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">No students in this class</p>
+              </div>
+            ) : (
+              <Table data-ocid="attendance.table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Roll No.</TableHead>
+                    <TableHead>Student Name</TableHead>
+                    <TableHead className="text-right">Attendance</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {classStudents.map((student, i) => {
+                    const status = attendance[student.id] ?? "present";
+                    return (
+                      <TableRow
+                        key={student.id}
+                        data-ocid={`attendance.item.${i + 1}`}
+                      >
+                        <TableCell className="font-mono text-muted-foreground text-sm">
+                          {student.rollNo.toString().padStart(2, "0")}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {student.name}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {(
+                              [
+                                "present",
+                                "absent",
+                                "late",
+                              ] as AttendanceStatus[]
+                            ).map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => setStatus(student.id, s)}
+                                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                                  status === s
+                                    ? statusConfig[s].className
+                                    : "border-border text-muted-foreground hover:bg-accent"
+                                }`}
+                                data-ocid={`attendance.${s}.toggle`}
+                              >
+                                {statusConfig[s].label}
+                              </button>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
 
-        <div className="mt-5 flex justify-end">
-          <Button
-            onClick={handleSubmit}
-            className="gap-2"
-            data-ocid="attendance.submit_button"
-          >
-            <Save className="w-4 h-4" />
-            Submit Attendance
-          </Button>
-        </div>
-      </motion.div>
+            <div className="mt-5 flex justify-end">
+              <Button
+                onClick={handleSubmit}
+                className="gap-2"
+                data-ocid="attendance.submit_button"
+              >
+                <Save className="w-4 h-4" /> Submit Attendance
+              </Button>
+            </div>
+          </motion.div>
+        </TabsContent>
+
+        {/* QR / Biometric Import */}
+        <TabsContent value="qr" className="mt-5">
+          <div className="grid lg:grid-cols-2 gap-5">
+            <div className="bg-card rounded-xl border border-border shadow-card p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-primary" />
+                <h2 className="font-semibold text-foreground">
+                  QR / Biometric Scan
+                </h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Paste or scan a student ID to mark attendance
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleQrScan()}
+                  placeholder="Scan or paste student ID..."
+                  className="flex-1 h-9 px-3 rounded-lg border border-border bg-accent text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  data-ocid="attendance.qr.input"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleQrScan}
+                  data-ocid="attendance.qr.submit_button"
+                >
+                  Mark Present
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tip: Try student IDs like "s1", "s2", etc.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border shadow-card p-5">
+              <h2 className="font-semibold text-foreground mb-4">
+                Scan History
+              </h2>
+              {scanHistory.length === 0 ? (
+                <div
+                  className="text-center py-10 text-muted-foreground"
+                  data-ocid="attendance.qr.empty_state"
+                >
+                  <QrCode className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No scans yet</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {scanHistory.map((s, i) => (
+                    <div
+                      key={`${s.id}-${i}`}
+                      className="flex items-center justify-between py-2 border-b border-border last:border-b-0"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ID: {s.id}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-success/10 text-success border-success/30"
+                        >
+                          Present
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {s.time}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Absence Reports */}
+        <TabsContent value="reports" className="mt-5">
+          <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+            <div className="p-5 border-b border-border">
+              <h2 className="font-semibold text-foreground">
+                Absence Summary Report
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Students with recorded absences this term
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <Table data-ocid="attendance.absence.table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Total Absences</TableHead>
+                    <TableHead className="hidden sm:table-cell">
+                      Last Absent
+                    </TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {absenceReports.map((report, i) => (
+                    <TableRow
+                      key={report.studentId}
+                      data-ocid={`attendance.absence.item.${i + 1}`}
+                    >
+                      <TableCell className="font-medium">
+                        {report.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        Class {report.class}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            report.totalAbsences >= 5
+                              ? "bg-destructive/10 text-destructive border-destructive/30"
+                              : "bg-warning/10 text-warning border-warning/30"
+                          }`}
+                        >
+                          {report.totalAbsences} days
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                        {report.lastAbsent}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 gap-1"
+                          onClick={() =>
+                            toast.success(
+                              `Alert sent to parent of ${report.name}`,
+                            )
+                          }
+                          data-ocid={`attendance.alert_parent.${i + 1}.button`}
+                        >
+                          <Bell className="w-3 h-3" /> Alert Parent
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }
